@@ -1,9 +1,14 @@
 package com.example.triptracker
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.lifecycleScope
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -19,10 +24,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.example.triptracker.data.local.database.DatabaseProvider
 import com.example.triptracker.data.repository.TripRepository
+import com.example.triptracker.location.LocationTracker
 import com.example.triptracker.viewmodel.MainViewModel
 import com.example.triptracker.viewmodel.MainViewModelFactory
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
+
+    private lateinit var locationTracker: LocationTracker
 
     private val viewModel: MainViewModel by viewModels {
         MainViewModelFactory(
@@ -32,22 +41,95 @@ class MainActivity : ComponentActivity() {
         )
     }
 
+    private val locationPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            startLocationTracking()
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        locationTracker = LocationTracker(applicationContext)
+
+        observeLocationUpdates()
+        observeTrackingState()
         setContent {
             MaterialTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize()
                 ) {
-                    MainScreen(viewModel = viewModel)
+                    MainScreen(
+                        viewModel = viewModel,
+                        onStartTrip = { pricePerKm ->
+                            viewModel.startTrip(pricePerKm)
+                        },
+                        onEndTrip = {
+                            viewModel.endTrip()
+                        }
+                    )
                 }
             }
         }
     }
+
+    private fun observeLocationUpdates() {
+        lifecycleScope.launch {
+            locationTracker.locationUpdates.collect { location ->
+                viewModel.onLocationUpdate(
+                    latitude = location.latitude,
+                    longitude = location.longitude,
+                    accuracy = location.accuracy,
+                    speed = location.speed
+                )
+            }
+        }
+    }
+
+    private fun observeTrackingState() {
+        lifecycleScope.launch {
+            viewModel.isTracking.collect { tracking ->
+                if (tracking) {
+                    checkLocationPermissionAndStart()
+                } else {
+                    locationTracker.stopTracking()
+                }
+            }
+        }
+    }
+
+    private fun checkLocationPermissionAndStart() {
+        when {
+            ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.ACCESS_FINE_LOCATION
+            ) == PackageManager.PERMISSION_GRANTED -> {
+                startLocationTracking()
+            }
+            else -> {
+                locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+            }
+        }
+    }
+
+    private fun startLocationTracking() {
+        locationTracker.startTracking()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        locationTracker.stopTracking()
+    }
 }
 
 @Composable
-fun MainScreen(viewModel: MainViewModel) {
+fun MainScreen(
+    viewModel: MainViewModel,
+    onStartTrip: (Double) -> Unit,
+    onEndTrip: () -> Unit
+) {
     val currentTrip by viewModel.currentTrip.collectAsState()
     val isTracking by viewModel.isTracking.collectAsState()
     val distanceKm by viewModel.distanceKm.collectAsState()
@@ -78,7 +160,7 @@ fun MainScreen(viewModel: MainViewModel) {
             onClick = {
                 val price = priceInput.toDoubleOrNull() ?: 0.0
                 if (price > 0) {
-                    viewModel.startTrip(price)
+                    onStartTrip(price)
                 }
             },
             modifier = Modifier.fillMaxWidth(),
@@ -88,7 +170,7 @@ fun MainScreen(viewModel: MainViewModel) {
         }
 
         Button(
-            onClick = { viewModel.endTrip() },
+            onClick = onEndTrip,
             modifier = Modifier.fillMaxWidth(),
             enabled = isTracking
         ) {
@@ -103,8 +185,9 @@ fun MainScreen(viewModel: MainViewModel) {
             }
         )
 
-        Text(text = "Distancia acumulada: %.2f km".format(distanceKm))
+        Text(text = "Distancia recorrida: %.2f km".format(distanceKm))
         Text(text = "Precio por km: %.2f".format(pricePerKm))
-        Text(text = "Total acumulado: %.2f".format(viewModel.totalAmount))
+        Text(text = "Total recorrido: %.2f".format(viewModel.totalAmount))
+
     }
 }

@@ -1,7 +1,6 @@
 package com.example.triptracker.viewmodel
 
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.triptracker.data.local.entity.LocationPointEntity
 import com.example.triptracker.data.local.entity.TripEntity
@@ -28,6 +27,8 @@ class MainViewModel(
     private val _pricePerKm = MutableStateFlow(0.0)
     val pricePerKm: StateFlow<Double> = _pricePerKm.asStateFlow()
 
+    private var lastAcceptedLocation: LocationPointEntity? = null
+
     init {
         loadInProgressTrip()
     }
@@ -49,6 +50,7 @@ class MainViewModel(
         viewModelScope.launch {
             val tripId = repository.startTrip(pricePerKm)
             val trip = repository.getTripById(tripId)
+            lastAcceptedLocation = null
             _currentTrip.value = trip
             _pricePerKm.value = pricePerKm
             _distanceKm.value = 0.0
@@ -78,6 +80,54 @@ class MainViewModel(
         }
     }
 
+    fun onLocationUpdate(
+        latitude: Double,
+        longitude: Double,
+        accuracy: Float,
+        speed: Float? = null
+    ) {
+        val trip = _currentTrip.value ?: return
+        if (!_isTracking.value) return
+
+        if (accuracy > 25f) return
+
+        val newPoint = LocationPointEntity(
+            tripId = trip.id,
+            latitude = latitude,
+            longitude = longitude,
+            accuracy = accuracy,
+            speed = speed,
+            timestamp = System.currentTimeMillis()
+        )
+
+        val previousPoint = lastAcceptedLocation
+        if (previousPoint != null) {
+            val results = FloatArray(1)
+            android.location.Location.distanceBetween(
+                previousPoint.latitude,
+                previousPoint.longitude,
+                newPoint.latitude,
+                newPoint.longitude,
+                results
+            )
+
+            val distanceMeters = results[0]
+
+            if (distanceMeters < 10f) {
+                return
+            }
+        }
+
+        addLocationPoint(
+            tripId = trip.id,
+            latitude = latitude,
+            longitude = longitude,
+            accuracy = accuracy,
+            speed = speed
+        )
+
+        lastAcceptedLocation = newPoint
+    }
     fun endTrip() {
         viewModelScope.launch {
             val trip = _currentTrip.value ?: return@launch
@@ -86,6 +136,7 @@ class MainViewModel(
 
             val updatedTrip = repository.endTrip(trip, distance)
 
+            lastAcceptedLocation = null
             _currentTrip.value = updatedTrip
             _distanceKm.value = updatedTrip.distanceKm
             _isTracking.value = false
