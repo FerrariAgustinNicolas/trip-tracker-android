@@ -3,6 +3,7 @@ package com.example.triptracker.data.repository
 import com.example.triptracker.data.local.dao.TripDao
 import com.example.triptracker.data.local.entity.LocationPointEntity
 import com.example.triptracker.data.local.entity.TripEntity
+import com.example.triptracker.domain.model.TripStatus
 import kotlinx.coroutines.flow.Flow
 
 class TripRepository(
@@ -13,7 +14,7 @@ class TripRepository(
         val trip = TripEntity(
             startTime = System.currentTimeMillis(),
             pricePerKm = pricePerKm,
-            status = "IN_PROGRESS"
+            status = TripStatus.IN_PROGRESS.name
         )
         return tripDao.insertTrip(trip)
     }
@@ -23,7 +24,7 @@ class TripRepository(
             endTime = System.currentTimeMillis(),
             distanceKm = distanceKm,
             totalAmount = distanceKm * trip.pricePerKm,
-            status = "FINISHED"
+            status = TripStatus.FINISHED.name
         )
         tripDao.updateTrip(updatedTrip)
         return updatedTrip
