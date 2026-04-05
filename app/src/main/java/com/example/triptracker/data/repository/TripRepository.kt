@@ -45,4 +45,8 @@ class TripRepository(
     suspend fun getLocationPointsForTrip(tripId: Long): List<LocationPointEntity> {
         return tripDao.getLocationPointsForTrip(tripId)
     }
+
+    suspend fun getTripById(tripId: Long): TripEntity? {
+        return tripDao.getTripById(tripId)
+    }
 }
