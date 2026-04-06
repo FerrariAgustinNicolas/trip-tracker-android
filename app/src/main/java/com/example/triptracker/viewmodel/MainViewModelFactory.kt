@@ -3,6 +3,8 @@ package com.example.triptracker.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import com.example.triptracker.data.repository.TripRepository
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.stateIn
 
 class MainViewModelFactory(
     private val repository: TripRepository

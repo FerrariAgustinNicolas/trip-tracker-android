@@ -28,6 +28,10 @@ import com.example.triptracker.location.LocationTracker
 import com.example.triptracker.viewmodel.MainViewModel
 import com.example.triptracker.viewmodel.MainViewModelFactory
 import kotlinx.coroutines.launch
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 
 class MainActivity : ComponentActivity() {
 
@@ -134,60 +138,139 @@ fun MainScreen(
     val isTracking by viewModel.isTracking.collectAsState()
     val distanceKm by viewModel.distanceKm.collectAsState()
     val pricePerKm by viewModel.pricePerKm.collectAsState()
+    val trips by viewModel.trips.collectAsState(initial = emptyList())
 
     var priceInput by remember { mutableStateOf("") }
 
-    Column(
+    LazyColumn(
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Text(
-            text = "Trip Tracker",
-            style = MaterialTheme.typography.headlineMedium
-        )
-
-        OutlinedTextField(
-            value = priceInput,
-            onValueChange = { priceInput = it },
-            label = { Text("Precio por km") },
-            modifier = Modifier.fillMaxWidth(),
-            enabled = !isTracking
-        )
-
-        Button(
-            onClick = {
-                val price = priceInput.toDoubleOrNull() ?: 0.0
-                if (price > 0) {
-                    onStartTrip(price)
-                }
-            },
-            modifier = Modifier.fillMaxWidth(),
-            enabled = !isTracking
-        ) {
-            Text("Iniciar viaje")
+        item {
+            Text(
+                text = "Trip Tracker",
+                style = MaterialTheme.typography.headlineMedium
+            )
         }
 
-        Button(
-            onClick = onEndTrip,
-            modifier = Modifier.fillMaxWidth(),
-            enabled = isTracking
-        ) {
-            Text("Finalizar viaje")
+        item {
+            OutlinedTextField(
+                value = priceInput,
+                onValueChange = { priceInput = it },
+                label = { Text("Precio por km") },
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !isTracking
+            )
         }
 
-        Text(
-            text = if (currentTrip != null && isTracking) {
-                "Estado: viaje en curso"
-            } else {
-                "Estado: sin viaje activo"
+        item {
+            Button(
+                onClick = {
+                    val price = priceInput.toDoubleOrNull() ?: 0.0
+                    if (price > 0) {
+                        onStartTrip(price)
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !isTracking
+            ) {
+                Text("Iniciar viaje")
             }
-        )
+        }
 
-        Text(text = "Distancia recorrida: %.2f km".format(distanceKm))
-        Text(text = "Precio por km: %.2f".format(pricePerKm))
-        Text(text = "Total recorrido: %.2f".format(viewModel.totalAmount))
+        item {
+            Button(
+                onClick = onEndTrip,
+                modifier = Modifier.fillMaxWidth(),
+                enabled = isTracking
+            ) {
+                Text("Finalizar viaje")
+            }
+        }
 
+        item {
+            Text(
+                text = if (currentTrip != null && isTracking) {
+                    "Estado: viaje en curso"
+                } else {
+                    "Estado: sin viaje activo"
+                }
+            )
+        }
+
+        item {
+            Text(text = "Distancia recorrida: %.2f km".format(distanceKm))
+        }
+
+        item {
+            Text(text = "Precio por km: %.2f".format(pricePerKm))
+        }
+
+        item {
+            Text(text = "Total recorrido: %.2f".format(viewModel.totalAmount))
+        }
+
+        item {
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "Historial de viajes",
+                style = MaterialTheme.typography.titleLarge
+            )
+        }
+
+        if (trips.isEmpty()) {
+            item {
+                Text("Todavía no hay viajes guardados.")
+            }
+        } else {
+            items(
+                items = trips,
+                key = { trip -> trip.id }
+            ) { trip: com.example.triptracker.data.local.entity.TripEntity ->
+                TripItem(
+                    date = trip.startTime,
+                    distanceKm = trip.distanceKm,
+                    pricePerKm = trip.pricePerKm,
+                    totalAmount = trip.totalAmount,
+                    status = trip.status
+                )
+            }
+        }
+    }
+}
+
+
+@Composable
+fun TripItem(
+    date: Long,
+    distanceKm: Double,
+    pricePerKm: Double,
+    totalAmount: Double,
+    status: String
+) {
+    val formattedDate = remember(date) {
+        java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", java.util.Locale.getDefault())
+            .format(java.util.Date(date))
+    }
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        tonalElevation = 2.dp
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Text(
+                text = formattedDate,
+                style = MaterialTheme.typography.titleMedium
+            )
+            Text(text = "Estado: $status")
+            Text(text = "Distancia: %.2f km".format(distanceKm))
+            Text(text = "Precio por km: %.2f".format(pricePerKm))
+            Text(text = "Total: %.2f".format(totalAmount))
+        }
     }
 }

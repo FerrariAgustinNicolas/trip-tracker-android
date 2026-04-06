@@ -9,6 +9,8 @@ import com.example.triptracker.util.DistanceUtils
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 class MainViewModel(
@@ -28,6 +30,13 @@ class MainViewModel(
     val pricePerKm: StateFlow<Double> = _pricePerKm.asStateFlow()
 
     private var lastAcceptedLocation: LocationPointEntity? = null
+
+    val trips: StateFlow<List<TripEntity>> = repository.getAllTrips()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
 
     init {
         loadInProgressTrip()
